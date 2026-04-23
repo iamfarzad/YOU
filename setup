@@ -1,0 +1,37 @@
+#!/bin/bash
+# YOU System Setup Script
+# Installs YOU CLI to system PATH
+
+set -e
+
+YOU_DIR="$HOME/YOU"
+BIN_DIR="$YOU_DIR/bin"
+TARGET_BIN="/usr/local/bin/you"
+
+echo "🔧 YOU System Setup"
+echo "=================="
+
+# Check if YOU exists
+if [ ! -d "$YOU_DIR" ]; then
+    echo "❌ YOU directory not found at $YOU_DIR"
+    echo "   Clone the repo first: git clone <repo> ~/YOU"
+    exit 1
+fi
+
+# Make sure bin/you is executable
+chmod +x "$BIN_DIR/you"
+
+echo "✅ YOU directory found: $YOU_DIR"
+echo "✅ CLI script ready: $BIN_DIR/you"
+echo ""
+echo "To install system-wide:"
+echo "  sudo ln -sf $BIN_DIR/you /usr/local/bin/you"
+echo ""
+echo "Or add to your PATH in ~/.bashrc:"
+echo "  export PATH=\"$BIN_DIR:\$PATH\""
+echo ""
+echo "Usage after install:"
+echo "  you ingest --event '...' --energy '-'"
+echo "  you query --categories work sleep"
+echo "  you predict --category work --months 6"
+echo "  you lint"

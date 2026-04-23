@@ -1,0 +1,414 @@
+#!/usr/bin/env python3
+"""
+YOU System CLI
+Operational layer for Life Intelligence Wiki
+"""
+
+import os
+import re
+import json
+import argparse
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import List, Dict, Optional
+
+YOU_DIR = Path.home() / "YOU"
+CATEGORIES_DIR = YOU_DIR / "Main Life Categories"
+INDEX_FILE = YOU_DIR / "index.md"
+LOG_FILE = YOU_DIR / "log.md"
+
+def get_category_path(category_name: str) -> Optional[Path]:
+    """Find category directory by fuzzy matching"""
+    category_lower = category_name.lower().replace("_", " ")
+    
+    if not CATEGORIES_DIR.exists():
+        return None
+    
+    for dir_name in os.listdir(CATEGORIES_DIR):
+        dir_path = CATEGORIES_DIR / dir_name
+        if not dir_path.is_dir():
+            continue
+        dir_lower = dir_name.lower()
+        if category_lower in dir_lower or dir_lower in category_lower:
+            return dir_path
+    return None
+
+def find_main_file(category_path: Path) -> Optional[Path]:
+    """Find the main markdown file in a category"""
+    md_files = list(category_path.glob("*.md"))
+    if not md_files:
+        return None
+    
+    # Prefer overview/main files
+    for f in md_files:
+        if "overview" in f.name.lower() or "main" in f.name.lower():
+            return f
+    
+    # Return first markdown file
+    return md_files[0]
+
+def parse_activity_log(content: str) -> List[Dict]:
+    """Extract activity log entries from markdown"""
+    entries = []
+    # Match table rows: | Date | Event | Energy | Cross-impact |
+    pattern = r"\|\s*(\d{4}-\d{2}-\d{2})\s*\|\s*(.+?)\s*\|\s*([\-+]{0,2})\s*\|"
+    matches = re.findall(pattern, content)
+    for date, event, energy in matches:
+        entries.append({
+            "date": date,
+            "event": event.strip(),
+            "energy": energy if energy else "="
+        })
+    return entries
+
+def update_activity_log(file_path: Path, date: str, event: str, energy: str = "=") -> bool:
+    """Add entry to Activity Log section"""
+    content = file_path.read_text()
+    
+    # Find Current section
+    current_match = re.search(r"## Current\s*\n(.*?)(?=## Future|$)", content, re.DOTALL)
+    if not current_match:
+        return False
+    
+    # Find or create Activity Log table
+    table_pattern = r"(## Current.*?)(\| Date \| Event/Entry \| Energy \| Cross-Impact \|\n\|------\|-------------\|--------\|--------------\|\n)(.*?)(?=###|##|$)"
+    table_match = re.search(table_pattern, content, re.DOTALL)
+    
+    new_entry = f"| {date} | {event} | {energy} | |\n"
+    
+    if table_match:
+        # Insert after header row
+        content = content.replace(
+            table_match.group(2),
+            table_match.group(2) + new_entry
+        )
+    else:
+        # Create new table
+        table = f"\n### Activity Log\n\n| Date | Event/Entry | Energy | Cross-Impact |\n|------|-------------|--------|--------------|\n{new_entry}\n"
+        content = content.replace(
+            current_match.group(0),
+            current_match.group(0) + table
+        )
+    
+    file_path.write_text(content)
+    return True
+
+def log_operation(operation: str, details: Dict):
+    """Append to log.md"""
+    if not LOG_FILE.exists():
+        LOG_FILE.write_text("# YOU System Log\n\n")
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    entry = f"## [{timestamp}] {operation}\n\n"
+    entry += json.dumps(details, indent=2)
+    entry += "\n\n---\n\n"
+    
+    content = LOG_FILE.read_text()
+    # Insert after header
+    lines = content.split("\n")
+    lines.insert(2, entry)
+    LOG_FILE.write_text("\n".join(lines))
+
+def cmd_ingest(args):
+    """INGEST: Log observation to category"""
+    category = args.category or infer_category(args.event)
+    category_path = get_category_path(category)
+    
+    if not category_path:
+        print(f"❌ Category not found: {category}")
+        return 1
+    
+    main_file = find_main_file(category_path)
+    if not main_file:
+        print(f"❌ No files in category: {category}")
+        return 1
+    
+    success = update_activity_log(
+        main_file,
+        args.date,
+        args.event,
+        args.energy
+    )
+    
+    if success:
+        print(f"✅ Logged to {category}/{main_file.name}")
+        log_operation("ingest", {
+            "category": category,
+            "file": str(main_file),
+            "date": args.date,
+            "event": args.event,
+            "energy": args.energy
+        })
+        return 0
+    else:
+        print("❌ Failed to update Activity Log")
+        return 1
+
+def infer_category(event: str) -> str:
+    """Infer category from event text"""
+    keywords = {
+        "work": ["manager", "meeting", "deadline", "project", "client", "colleague", "promotion"],
+        "mental_health": ["anxiety", "stress", "therapy", "depressed", "mood", "feeling"],
+        "sleep": ["insomnia", "tired", "couldn't sleep", "woke up", "bedtime"],
+        "relationships": ["partner", "spouse", "dating", "argument", "breakup"],
+        "finance": ["money", "bill", "expensive", "budget", "debt", "saving"],
+        "physical_health": ["exercise", "gym", "workout", "running", "sick", "doctor"],
+    }
+    
+    event_lower = event.lower()
+    for category, words in keywords.items():
+        if any(word in event_lower for word in words):
+            return category
+    
+    return "mental_health"  # default
+
+def cmd_query(args):
+    """QUERY: Synthesize patterns across categories"""
+    categories = args.categories or []
+    if not categories:
+        print("❌ No categories specified")
+        return 1
+    
+    results = []
+    for category in categories:
+        category_path = get_category_path(category)
+        if not category_path:
+            continue
+        
+        main_file = find_main_file(category_path)
+        if not main_file:
+            continue
+        
+        content = main_file.read_text()
+        entries = parse_activity_log(content)
+        
+        results.append({
+            "category": category,
+            "file": str(main_file),
+            "entries": entries
+        })
+    
+    # Find cross-category patterns
+    print("\n" + "="*60)
+    print("QUERY RESULTS")
+    print("="*60)
+    
+    total_entries = sum(len(r["entries"]) for r in results)
+    print(f"\nFound {total_entries} entries across {len(results)} categories")
+    
+    for result in results:
+        print(f"\n📁 {result['category']}")
+        print(f"   File: {result['file']}")
+        if result['entries']:
+            recent = result['entries'][-3:] if len(result['entries']) > 3 else result['entries']
+            for entry in recent:
+                print(f"   • {entry['date']}: {entry['event']} [{entry['energy']}]")
+        else:
+            print("   (No entries)")
+    
+    # Surface cross-category connections
+    if len(results) > 1:
+        print("\n🔗 Cross-category connections:")
+        print("   Events in these categories may influence each other")
+        print("   → Check Future sections for projected cascade effects")
+    
+    log_operation("query", {
+        "categories": categories,
+        "results_count": len(results),
+        "total_entries": total_entries
+    })
+    
+    return 0
+
+def cmd_predict(args):
+    """PREDICT: Project future trajectories"""
+    category = args.category
+    months = args.months
+    
+    category_path = get_category_path(category)
+    if not category_path:
+        print(f"❌ Category not found: {category}")
+        return 1
+    
+    main_file = find_main_file(category_path)
+    if not main_file:
+        print(f"❌ No files in category: {category}")
+        return 1
+    
+    content = main_file.read_text()
+    entries = parse_activity_log(content)
+    
+    # Calculate metrics
+    if not entries:
+        print(f"\n📊 {category}: No data to project from")
+        return 0
+    
+    recent = [e for e in entries if e['date'] > (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")]
+    negative = len([e for e in recent if '-' in e['energy']])
+    positive = len([e for e in recent if '+' in e['energy']])
+    
+    # Extract satisfaction from Current section
+    satisfaction_match = re.search(r"satisfaction: \[(\d+)\]/10", content)
+    satisfaction = int(satisfaction_match.group(1)) if satisfaction_match else 5
+    
+    print("\n" + "="*60)
+    print(f"PREDICTION: {category.upper()}")
+    print("="*60)
+    
+    print(f"\n📊 Current State:")
+    print(f"   Entries (30d): {len(recent)}")
+    print(f"   Negative: {negative}")
+    print(f"   Positive: {positive}")
+    print(f"   Satisfaction: {satisfaction}/10")
+    
+    print(f"\n🔮 Projection ({months} months):")
+    
+    if satisfaction < 4 and negative > 2:
+        print("   ⚠️  TRAJECTORY: DECLINING")
+        print("   If unaddressed:")
+        print(f"   → {months//3} mo: Continued degradation")
+        print(f"   → {months//2} mo: Likely affecting adjacent categories")
+        print(f"   → {months} mo: Significant quality of life impact")
+        print("\n   💡 Recommended: Update 'Future → With attention' section")
+    elif satisfaction > 7 and positive > negative:
+        print("   ✅ TRAJECTORY: IMPROVING")
+        print("   Maintaining current path:")
+        print(f"   → {months//3} mo: Building positive momentum")
+        print(f"   → {months} mo: Strong position")
+    else:
+        print("   ➖ TRAJECTORY: STABLE")
+        print("   No significant change expected without intervention")
+    
+    # Check Future section for existing projection
+    future_match = re.search(r"## Future.*?(?=## |$)", content, re.DOTALL)
+    if future_match:
+        print("\n📄 Current Future section exists:")
+        print("   Review and update based on recent entries")
+    
+    log_operation("predict", {
+        "category": category,
+        "months": months,
+        "satisfaction": satisfaction,
+        "entries_30d": len(recent)
+    })
+    
+    return 0
+
+def cmd_lint(args):
+    """LINT: Health check wiki"""
+    issues = {
+        "orphan": [],
+        "stale": [],
+        "empty": []
+    }
+    
+    all_md = list(YOU_DIR.rglob("*.md"))
+    now = datetime.now()
+    
+    print("\n" + "="*60)
+    print("LINT: Wiki Health Check")
+    print("="*60)
+    
+    for md_file in all_md:
+        content = md_file.read_text()
+        rel_path = md_file.relative_to(YOU_DIR)
+        
+        # Check orphans (no up:: link)
+        if "up:: [[" not in content and md_file.name not in ["YOU.md", "index.md", "log.md", "README.md"]:
+            issues["orphan"].append(str(rel_path))
+        
+        # Check staleness
+        entries = parse_activity_log(content)
+        if entries:
+            latest = max(e['date'] for e in entries)
+            latest_date = datetime.strptime(latest, "%Y-%m-%d")
+            if (now - latest_date).days > 180:
+                issues["stale"].append({
+                    "file": str(rel_path),
+                    "last_entry": latest
+                })
+    
+    # Check empty categories
+    for category in os.listdir(CATEGORIES_DIR) if CATEGORIES_DIR.exists() else []:
+        cat_path = CATEGORIES_DIR / category
+        if cat_path.is_dir():
+            md_count = len(list(cat_path.glob("*.md")))
+            if md_count == 0:
+                issues["empty"].append(category)
+    
+    print(f"\n📊 Summary:")
+    print(f"   Total files: {len(all_md)}")
+    print(f"   Orphan files: {len(issues['orphan'])}")
+    print(f"   Stale files (>6mo): {len(issues['stale'])}")
+    print(f"   Empty categories: {len(issues['empty'])}")
+    
+    if issues['orphan']:
+        print(f"\n⚠️  Orphan files (no up:: link):")
+        for f in issues['orphan'][:5]:
+            print(f"   • {f}")
+    
+    if issues['stale']:
+        print(f"\n⏰ Stale files:")
+        for item in issues['stale'][:5]:
+            print(f"   • {item['file']} (last: {item['last_entry']})")
+    
+    print("\n✅ Lint complete")
+    
+    log_operation("lint", {
+        "total_files": len(all_md),
+        "orphan_count": len(issues['orphan']),
+        "stale_count": len(issues['stale'])
+    })
+    
+    return 0
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="YOU System - Life Intelligence Wiki Operations",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+    
+    # INGEST
+    ingest = subparsers.add_parser("ingest", help="Log observation")
+    ingest.add_argument("--date", default=datetime.now().strftime("%Y-%m-%d"))
+    ingest.add_argument("--event", required=True)
+    ingest.add_argument("--energy", default="=", choices=["++", "+", "=", "-", "--"])
+    ingest.add_argument("--category", help="Auto-detected if not provided")
+    
+    # QUERY
+    query = subparsers.add_parser("query", help="Synthesize patterns")
+    query.add_argument("--categories", nargs="+", required=True)
+    
+    # PREDICT
+    predict = subparsers.add_parser("predict", help="Project future")
+    predict.add_argument("--category", required=True)
+    predict.add_argument("--months", type=int, default=6)
+    
+    # LINT
+    lint = subparsers.add_parser("lint", help="Health check")
+    
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        return 1
+    
+    # Ensure YOU_DIR exists
+    if not YOU_DIR.exists():
+        print(f"❌ YOU directory not found: {YOU_DIR}")
+        print("   Run from within ~/YOU or clone the repo first")
+        return 1
+    
+    commands = {
+        "ingest": cmd_ingest,
+        "query": cmd_query,
+        "predict": cmd_predict,
+        "lint": cmd_lint
+    }
+    
+    return commands[args.command](args)
+
+if __name__ == "__main__":
+    exit(main())

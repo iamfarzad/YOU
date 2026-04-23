@@ -42,6 +42,7 @@ tags:: #WorkOverview #LifeCategory
 ### Activity Log
 | Date | Event/Entry | Energy | Cross-Impact |
 |------|-------------|--------|--------------|
+| 2026-04-23 | Meeting with manager was tense, felt dismissed | - | |
 | YYYY-MM-DD | | +/-/= | [[Category]] |
 
 ### Cross-Category Effects
