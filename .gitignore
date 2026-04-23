@@ -1,0 +1,18 @@
+# System files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Obsidian (if used)
+.obsidian/workspace.json
+.obsidian/graph.json
+.obsidian/cache/
+
+# IDE
+.cursorrules
+cursor.md
+.vscode/
+
+# Temp
+*.tmp
+*.temp
