@@ -1,0 +1,5 @@
+name: you-memory-openclaw
+version: 0.1.0
+steps:
+  - run: you refresh-awareness
+  - run: you recall --query "${USER_MESSAGE}" --json
