@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ $# -lt 1 ]]; then
+  echo "Usage: you-memory recall \"<query>\" [--limit N] [--no-sensitive]"
+  exit 1
+fi
+
+cmd="$1"
+shift
+
+if [[ "$cmd" == "recall" ]]; then
+  query="${1:-}"
+  if [[ -z "$query" ]]; then
+    echo "Usage: you-memory recall \"<query>\" [--limit N] [--no-sensitive]"
+    exit 1
+  fi
+  shift
+  exec "$SCRIPT_DIR/you" recall --query "$query" "$@"
+else
+  echo "Unsupported command: $cmd"
+  exit 1
+fi

@@ -38,6 +38,8 @@ PATTERNS_FILE = SYSTEM_DIR / "PATTERNS.md"
 OPEN_LOOPS_FILE = SYSTEM_DIR / "OPEN_LOOPS.md"
 CONTRADICTIONS_FILE = SYSTEM_DIR / "CONTRADICTIONS.md"
 REVIEW_QUEUE_FILE = SYSTEM_DIR / "REVIEW_QUEUE.md"
+RECALL_INDEX_MD_FILE = SYSTEM_DIR / "RECALL_INDEX.md"
+RECALL_INDEX_JSON_FILE = SYSTEM_DIR / "recall_index.json"
 TAXONOMY_FILE = SYSTEM_DIR / "TAXONOMY.md"
 CATEGORY_RULES_FILE = SYSTEM_DIR / "CATEGORY_RULES.md"
 CATEGORY_STATE_FILE = SYSTEM_DIR / "CATEGORY_STATE.json"
@@ -81,6 +83,14 @@ def ensure_user_surface_files():
             "- one high-confidence event exists,\n"
             "- it bridges already-visible areas.\n"
         )
+    if not RECALL_INDEX_MD_FILE.exists():
+        RECALL_INDEX_MD_FILE.write_text(
+            "# Recall Index\n\n"
+            "Short memory cards for conversation-time retrieval.\n"
+            "Each card must be relevance-filtered, confidence-labeled, and source-linked.\n"
+        )
+    if not RECALL_INDEX_JSON_FILE.exists():
+        RECALL_INDEX_JSON_FILE.write_text("{\n  \"memories\": []\n}\n")
 
 def load_category_state() -> Dict:
     if CATEGORY_STATE_FILE.exists():
@@ -115,6 +125,61 @@ def append_if_missing(file_path: Path, text: str):
     if text not in content:
         suffix = "\n" if content.endswith("\n") or content == "" else "\n\n"
         file_path.write_text(content + suffix + text + "\n")
+
+def load_recall_index() -> Dict:
+    if not RECALL_INDEX_JSON_FILE.exists():
+        return {"memories": []}
+    try:
+        data = json.loads(RECALL_INDEX_JSON_FILE.read_text())
+    except json.JSONDecodeError:
+        return {"memories": []}
+    if "memories" not in data or not isinstance(data["memories"], list):
+        data["memories"] = []
+    return data
+
+def save_recall_index(index: Dict):
+    RECALL_INDEX_JSON_FILE.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n")
+
+def token_set(text: str) -> set:
+    return set(re.findall(r"[a-zA-Z0-9_]+", text.lower()))
+
+def relevance_score(query: str, memory: Dict) -> int:
+    q_tokens = token_set(query)
+    if not q_tokens:
+        return 0
+    hay = " ".join([
+        memory.get("title", ""),
+        memory.get("summary", ""),
+        " ".join(memory.get("tags", [])),
+    ])
+    h_tokens = token_set(hay)
+    return len(q_tokens.intersection(h_tokens))
+
+def infer_sensitivity(memory: Dict) -> str:
+    text = " ".join([memory.get("title", ""), memory.get("summary", "")]).lower()
+    if any(w in text for w in ["health", "anxiety", "fear", "relationship", "therapy"]):
+        return "medium"
+    return "low"
+
+def confidence_rank(level: str) -> int:
+    return {"low": 1, "medium": 2, "high": 3}.get(level, 1)
+
+def surface_level(memory: Dict, query: str, consent: bool = True) -> int:
+    rel = relevance_score(query, memory)
+    conf = confidence_rank(memory.get("confidence", "low"))
+    sensitivity = infer_sensitivity(memory)
+    evidence = int(memory.get("evidence_count", 1))
+    if rel == 0:
+        return 0
+    if sensitivity == "medium" and not consent:
+        return 0
+    if conf <= 1 and evidence <= 1:
+        return 1
+    if conf == 2 and evidence >= 2:
+        return 2
+    if conf >= 2 and sensitivity == "medium":
+        return 3
+    return 2
 
 def get_category_path(category_name: str) -> Optional[Path]:
     """Find category directory by fuzzy matching"""
@@ -298,6 +363,7 @@ updated: {datetime.now().strftime("%Y-%m-%d %H:%M")}
 def refresh_awareness(days: int = 30) -> Path:
     """Write awareness snapshot to System/AWARENESS.md."""
     ensure_system_dirs()
+    ensure_user_surface_files()
     AWARENESS_FILE.write_text(build_awareness_snapshot(days=days))
     return AWARENESS_FILE
 
@@ -587,6 +653,7 @@ def cmd_process_inbox(args):
     ensure_system_dirs()
     ensure_user_surface_files()
     state = load_category_state()
+    recall_index = load_recall_index()
     raw_files = sorted(INBOX_RAW_DIR.glob("*.md"))
     if not raw_files:
         print("ℹ️ No raw inbox items found")
@@ -671,6 +738,25 @@ def cmd_process_inbox(args):
 
         state[detected_category] = category_meta
 
+        memory_type = "pattern" if category_meta["evidence_count"] >= 2 else "observation"
+        memory_id = f"mem_{date.replace('-', '_')}_{processed_count+1:03d}_{detected_category.lower().replace(' ', '_')}"
+        memory = {
+            "id": memory_id,
+            "title": f"{detected_category} signal",
+            "type": memory_type,
+            "summary": f"{event}",
+            "tags": [detected_category.lower().replace(" ", "_"), "inbox"],
+            "time_layer": "present",
+            "confidence": category_meta["confidence"],
+            "evidence_count": category_meta["evidence_count"],
+            "last_seen": date,
+            "sensitivity": "medium" if detected_category in ["Mental Health", "Sleep Patterns", "Relationships"] else "low",
+            "surface_level": 2,
+            "source_links": [str(normalized_file.relative_to(YOU_DIR))],
+        }
+        if not any(m.get("id") == memory_id for m in recall_index["memories"]):
+            recall_index["memories"].append(memory)
+
         # Emergent category suggestion (safe, optional)
         emergent_keywords = ["unreliable", "delay", "shame", "avoiding admin", "trusted"]
         if sum(1 for kw in emergent_keywords if kw in lower_event) >= 2:
@@ -702,6 +788,7 @@ def cmd_process_inbox(args):
         processed_count += 1
 
     save_category_state(state)
+    save_recall_index(recall_index)
     awareness_path = refresh_awareness(days=args.days)
     print(f"✅ Processed {processed_count} inbox item(s)")
     print(f"✅ Refreshed awareness: {awareness_path}")
@@ -808,6 +895,49 @@ SORT file.ctime DESC
     log_operation("obsidian-dashboard", {"file": str(dashboard)})
     return 0
 
+def cmd_recall(args):
+    """Recall relevant memory cards for a conversation query."""
+    ensure_system_dirs()
+    ensure_user_surface_files()
+    index = load_recall_index()
+    query = args.query.strip()
+    consent = not args.no_sensitive
+
+    scored = []
+    for memory in index.get("memories", []):
+        rel = relevance_score(query, memory)
+        level = surface_level(memory, query, consent=consent)
+        if rel <= 0 or level <= 0:
+            continue
+        enriched = dict(memory)
+        enriched["relevance"] = rel
+        enriched["surface_level"] = max(level, int(memory.get("surface_level", 1)))
+        enriched["suggested_surface"] = enriched["surface_level"] >= 2
+        scored.append(enriched)
+
+    scored.sort(key=lambda m: (m["relevance"], confidence_rank(m.get("confidence", "low")), m.get("evidence_count", 0)), reverse=True)
+    top = scored[:args.limit]
+
+    if top:
+        lead = top[0]
+        surface_message = (
+            f"I found a related memory: {lead.get('title', 'Untitled')}. "
+            "Do you want me to open that pattern?"
+            if lead.get("surface_level", 0) >= 3
+            else f"You've mentioned something similar before. ({lead.get('title', 'pattern')})"
+        )
+    else:
+        surface_message = "No relevant memory was surfaced for this query."
+
+    response = {
+        "relevant_memories": top,
+        "surface_message": surface_message,
+    }
+
+    print(json.dumps(response, indent=2))
+    log_operation("recall", {"query": query, "results": len(top), "limit": args.limit})
+    return 0
+
 def main():
     parser = argparse.ArgumentParser(
         description="YOU System - Life Intelligence Wiki Operations",
@@ -858,6 +988,12 @@ def main():
 
     # OBSIDIAN-DASHBOARD
     subparsers.add_parser("obsidian-dashboard", help="Create Dataview dashboard markdown")
+
+    # RECALL
+    recall = subparsers.add_parser("recall", help="Recall relevant memories for a conversation query")
+    recall.add_argument("--query", required=True)
+    recall.add_argument("--limit", type=int, default=5)
+    recall.add_argument("--no-sensitive", action="store_true", help="Do not surface medium-sensitivity memories")
     
     args = parser.parse_args()
     
@@ -882,6 +1018,7 @@ def main():
         "contradictions": cmd_contradictions,
         "daily-review": cmd_daily_review,
         "obsidian-dashboard": cmd_obsidian_dashboard,
+        "recall": cmd_recall,
     }
     
     return commands[args.command](args)

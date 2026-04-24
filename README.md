@@ -35,6 +35,8 @@ YOU/
 │   └── processed/            # Archived processed raw notes
 ├── System/
 │   ├── AWARENESS.md          # Compressed working-memory snapshot
+│   ├── RECALL_INDEX.md       # Conversation-time memory surfacing rules
+│   ├── recall_index.json     # Machine-readable memory cards
 │   ├── TAXONOMY.md           # Hidden ontology
 │   ├── CATEGORY_RULES.md     # Surfacing thresholds
 │   ├── CATEGORY_STATE.json   # Machine-readable state
@@ -52,6 +54,7 @@ YOU/
 3. Normalize + compile with `you process-inbox`
 4. Surface categories only when thresholds are met (`System/CATEGORY_RULES.md`)
 5. Review `System/AWARENESS.md` before deep category traversal
+6. For conversation retrieval, use `you recall --query "..."` (or `you-memory recall "..."`)
 
 ## Philosophy
 

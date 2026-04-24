@@ -98,6 +98,12 @@ Every file tracks across time:
 3. Track open loops and watchlist risks
 4. Write compressed snapshot to `System/AWARENESS.md`
 
+### Recall (Conversation Memory)
+1. Read `System/recall_index.json` for candidate memories
+2. Apply memory gate: relevance, confidence, sensitivity, consent, recency, source
+3. Assign surface level (0-4) and return only top relevant cards
+4. Phrase surfaced memory as optional and correctable
+
 ### Query
 1. Read index.md for navigation
 2. Search relevant category files

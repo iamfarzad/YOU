@@ -192,13 +192,14 @@ No code execution needed — read files, update files, surface patterns.
 ## Agent Boot Sequence
 
 1. Read `System/AWARENESS.md`
-2. Read `Profile.md`, `Current Notes.md`, `Recent Reflections.md`, `Open Questions.md`
-3. Read `log.md`
-4. Read `index.md` only if needed for hidden ontology navigation
-5. Read `Visible/` pages before `Main Life Categories/`
-6. Read only relevant category files in `Main Life Categories/` when evidence requires it
-7. Never infer from memory alone when source files disagree
-8. Cite source files when giving insight
+2. Read `System/RECALL_INDEX.md` and `System/recall_index.json`
+3. Read `Profile.md`, `Current Notes.md`, `Recent Reflections.md`, `Open Questions.md`
+4. Read `log.md`
+5. Read `index.md` only if needed for hidden ontology navigation
+6. Read `Visible/` pages before `Main Life Categories/`
+7. Read only relevant category files in `Main Life Categories/` when evidence requires it
+8. Never infer from memory alone when source files disagree
+9. Cite source files when giving insight
 
 ---
 

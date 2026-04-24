@@ -38,6 +38,7 @@ Life domains influence each other. Work stress → Sleep quality → Relationshi
 - [[Visible]] — surfaced categories with enough evidence
 - [[Emerging]] — suggested categories awaiting confirmation
 - [[System/AWARENESS]] — compressed working-memory snapshot
+- [[System/RECALL_INDEX]] — conversation memory surfacing layer
 
 > The full 51-category ontology is hidden scaffolding for the system.  
 > Categories become visible only when evidence passes surfacing rules.
