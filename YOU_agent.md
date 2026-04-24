@@ -189,10 +189,23 @@ No code execution needed — read files, update files, surface patterns.
 
 ---
 
+## Agent Boot Sequence
+
+1. Read `System/AWARENESS.md`
+2. Read `Profile.md`, `Current Notes.md`, `Recent Reflections.md`, `Open Questions.md`
+3. Read `log.md`
+4. Read `index.md` only if needed for hidden ontology navigation
+5. Read `Visible/` pages before `Main Life Categories/`
+6. Read only relevant category files in `Main Life Categories/` when evidence requires it
+7. Never infer from memory alone when source files disagree
+8. Cite source files when giving insight
+
+---
+
 ## Getting Started
 
-1. **Navigate**: Start at `YOU.md` → use `index.md` to find category
-2. **Ingest**: Add entry to Activity Log in Current section  
+1. **Navigate**: Start at `System/AWARENESS.md` + user-facing pages
+2. **Ingest**: Capture with `you capture`, then compile with `you process-inbox`
 3. **Query**: Read Past + Current across 2-3 categories for patterns
 4. **Predict**: Extend Future sections into time horizons
 5. **Lint**: Before long sessions, run health check

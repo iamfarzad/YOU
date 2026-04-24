@@ -8,14 +8,113 @@ import os
 import re
 import json
 import argparse
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional
 
-YOU_DIR = Path.home() / "YOU"
+def resolve_you_dir() -> Path:
+    """Resolve YOU directory from env, cwd, or fallback to ~/YOU."""
+    env_dir = os.environ.get("YOU_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser()
+
+    cwd = Path.cwd()
+    if (cwd / "SCHEMA.md").exists() and (cwd / "Main Life Categories").exists():
+        return cwd
+
+    return Path.home() / "YOU"
+
+YOU_DIR = resolve_you_dir()
 CATEGORIES_DIR = YOU_DIR / "Main Life Categories"
 INDEX_FILE = YOU_DIR / "index.md"
 LOG_FILE = YOU_DIR / "log.md"
+INBOX_RAW_DIR = YOU_DIR / "Inbox" / "raw"
+INBOX_NORMALIZED_DIR = YOU_DIR / "Inbox" / "normalized"
+INBOX_PROCESSED_DIR = YOU_DIR / "Inbox" / "processed"
+SYSTEM_DIR = YOU_DIR / "System"
+AWARENESS_FILE = SYSTEM_DIR / "AWARENESS.md"
+PATTERNS_FILE = SYSTEM_DIR / "PATTERNS.md"
+OPEN_LOOPS_FILE = SYSTEM_DIR / "OPEN_LOOPS.md"
+CONTRADICTIONS_FILE = SYSTEM_DIR / "CONTRADICTIONS.md"
+REVIEW_QUEUE_FILE = SYSTEM_DIR / "REVIEW_QUEUE.md"
+TAXONOMY_FILE = SYSTEM_DIR / "TAXONOMY.md"
+CATEGORY_RULES_FILE = SYSTEM_DIR / "CATEGORY_RULES.md"
+CATEGORY_STATE_FILE = SYSTEM_DIR / "CATEGORY_STATE.json"
+VISIBLE_DIR = YOU_DIR / "Visible"
+EMERGING_DIR = YOU_DIR / "Emerging"
+PROFILE_FILE = YOU_DIR / "Profile.md"
+CURRENT_NOTES_FILE = YOU_DIR / "Current Notes.md"
+RECENT_REFLECTIONS_FILE = YOU_DIR / "Recent Reflections.md"
+OPEN_QUESTIONS_FILE = YOU_DIR / "Open Questions.md"
+
+def ensure_system_dirs():
+    """Ensure required inbox/system folders exist."""
+    for path in [
+        INBOX_RAW_DIR, INBOX_NORMALIZED_DIR, INBOX_PROCESSED_DIR, SYSTEM_DIR, VISIBLE_DIR, EMERGING_DIR
+    ]:
+        path.mkdir(parents=True, exist_ok=True)
+
+def ensure_user_surface_files():
+    """Ensure minimal user-facing entry pages exist."""
+    defaults = {
+        PROFILE_FILE: "# Profile\n\n## Identity\n- Add your name or alias.\n\n## Values\n- Add direct values from user-provided input only.\n\n## Goals\n- Add explicit user-stated goals.\n",
+        CURRENT_NOTES_FILE: "# Current Notes\n\n- Latest user observations appear here.\n",
+        RECENT_REFLECTIONS_FILE: "# Recent Reflections\n\n- This page captures synthesized reflections from recent activity.\n",
+        OPEN_QUESTIONS_FILE: "# Open Questions\n\n- Questions to revisit are tracked here.\n",
+    }
+    for file_path, content in defaults.items():
+        if not file_path.exists():
+            file_path.write_text(content)
+    if not TAXONOMY_FILE.exists():
+        TAXONOMY_FILE.write_text(
+            "# Taxonomy (Hidden Scaffolding)\n\n"
+            "This file holds latent categories (the ontology), not the default user UI.\n"
+            "Use `index.md` as canonical source for the full category list.\n"
+        )
+    if not CATEGORY_RULES_FILE.exists():
+        CATEGORY_RULES_FILE.write_text(
+            "# Category Rules\n\n"
+            "Show category when one of these is true:\n"
+            "- 2-3 related observations exist,\n"
+            "- user directly names it,\n"
+            "- one high-confidence event exists,\n"
+            "- it bridges already-visible areas.\n"
+        )
+
+def load_category_state() -> Dict:
+    if CATEGORY_STATE_FILE.exists():
+        try:
+            return json.loads(CATEGORY_STATE_FILE.read_text())
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+def save_category_state(state: Dict):
+    CATEGORY_STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+
+def normalize_category_name(category: str) -> str:
+    mapping = {
+        "work": "Work",
+        "mental_health": "Mental Health",
+        "sleep": "Sleep Patterns",
+        "relationships": "Relationships",
+        "finance": "Finance",
+        "physical_health": "Physical Health",
+    }
+    key = category.lower().replace(" ", "_")
+    return mapping.get(key, category.replace("_", " ").title())
+
+def compute_activation_score(evidence_count: int, intensity: int = 0, cross_links: int = 0,
+                             user_confirmation: int = 0, contradiction_penalty: int = 0) -> int:
+    recency_weight = 1 if evidence_count > 0 else 0
+    return evidence_count + recency_weight + intensity + cross_links + user_confirmation - contradiction_penalty
+
+def append_if_missing(file_path: Path, text: str):
+    content = file_path.read_text() if file_path.exists() else ""
+    if text not in content:
+        suffix = "\n" if content.endswith("\n") or content == "" else "\n\n"
+        file_path.write_text(content + suffix + text + "\n")
 
 def get_category_path(category_name: str) -> Optional[Path]:
     """Find category directory by fuzzy matching"""
@@ -108,6 +207,99 @@ def log_operation(operation: str, details: Dict):
     lines = content.split("\n")
     lines.insert(2, entry)
     LOG_FILE.write_text("\n".join(lines))
+
+def build_awareness_snapshot(days: int = 30) -> str:
+    """Build compressed awareness snapshot from recent logs and system state."""
+    cutoff = datetime.now() - timedelta(days=days)
+    recent_entries: List[Dict] = []
+    category_counter: Dict[str, int] = {}
+    negative_count = 0
+    positive_count = 0
+
+    for category_dir in os.listdir(CATEGORIES_DIR) if CATEGORIES_DIR.exists() else []:
+        category_path = CATEGORIES_DIR / category_dir
+        if not category_path.is_dir():
+            continue
+        main_file = find_main_file(category_path)
+        if not main_file:
+            continue
+
+        entries = parse_activity_log(main_file.read_text())
+        for entry in entries:
+            try:
+                entry_dt = datetime.strptime(entry["date"], "%Y-%m-%d")
+            except ValueError:
+                continue
+            if entry_dt < cutoff:
+                continue
+            recent_entries.append({
+                "category": category_dir,
+                **entry
+            })
+            category_counter[category_dir] = category_counter.get(category_dir, 0) + 1
+            if "-" in entry["energy"]:
+                negative_count += 1
+            if "+" in entry["energy"]:
+                positive_count += 1
+
+    state = load_category_state()
+    visible_categories = [name for name, meta in state.items() if isinstance(meta, dict) and meta.get("visible")]
+    top_categories = sorted(category_counter.items(), key=lambda x: x[1], reverse=True)[:5]
+    top_list = "\n".join([f"- {name}: {count} entries in last {days} days." for name, count in top_categories]) or "- No recent category activity found."
+
+    patterns = []
+    if negative_count > positive_count:
+        patterns.append("| Negative energy trend | More negative than positive entries in recent activity | medium | active |")
+    if positive_count >= negative_count and (positive_count + negative_count) > 0:
+        patterns.append("| Recovery trend | Positive/neutral momentum is not worse than negatives | low-medium | observe |")
+    patterns_table = "\n".join(patterns) if patterns else "| Pattern signal pending | Not enough recent energy data | low | needs data |"
+
+    open_loops = []
+    if OPEN_LOOPS_FILE.exists():
+        lines = [ln.strip() for ln in OPEN_LOOPS_FILE.read_text().splitlines() if ln.strip().startswith("- ")]
+        open_loops.extend(lines[:5])
+    if not open_loops:
+        open_loops = ["- No explicit open loops recorded. Use `you daily-review` to add one."]
+
+    watchlist = [
+        f"- Burnout risk: {'medium' if negative_count >= 3 else 'low'}",
+        "- Relationship spillover: unknown",
+        "- Recovery habits: needs more consistent logging",
+    ]
+
+    next_question = "What changed after the most recent high-stress event?"
+
+    visible_summary = ", ".join(visible_categories[:8]) if visible_categories else "None yet"
+
+    return f"""# YOU Awareness Snapshot
+updated: {datetime.now().strftime("%Y-%m-%d %H:%M")}
+
+## Current state
+- Recent entries analyzed: {len(recent_entries)} (last {days} days)
+- Energy balance: +{positive_count} / -{negative_count}
+- Visible categories: {visible_summary}
+{top_list}
+
+## Active patterns
+| Pattern | Evidence | Confidence | Status |
+|---|---|---|---|
+{patterns_table}
+
+## Open loops
+{chr(10).join(open_loops)}
+
+## Watchlist
+{chr(10).join(watchlist)}
+
+## Next useful question
+"{next_question}"
+"""
+
+def refresh_awareness(days: int = 30) -> Path:
+    """Write awareness snapshot to System/AWARENESS.md."""
+    ensure_system_dirs()
+    AWARENESS_FILE.write_text(build_awareness_snapshot(days=days))
+    return AWARENESS_FILE
 
 def cmd_ingest(args):
     """INGEST: Log observation to category"""
@@ -362,6 +554,260 @@ def cmd_lint(args):
     
     return 0
 
+def cmd_capture(args):
+    """CAPTURE: store raw signal in Inbox/raw as YAML-like record."""
+    ensure_system_dirs()
+    stamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    file_path = INBOX_RAW_DIR / f"{stamp}_{args.source}.md"
+    created = datetime.now().strftime("%Y-%m-%d %H:%M")
+    content = (
+        f"id: {stamp}_{args.source}\n"
+        f"source: {args.source}\n"
+        f"created: {created}\n"
+        f"raw_text: {json.dumps(args.text)}\n"
+        "processed: false\n"
+    )
+    file_path.write_text(content)
+    print(f"✅ Captured raw entry: {file_path}")
+    log_operation("capture", {"source": args.source, "file": str(file_path), "created": created})
+    return 0
+
+def parse_raw_note(file_path: Path) -> Dict:
+    """Read simple key/value raw note format."""
+    data: Dict[str, str] = {}
+    for line in file_path.read_text().splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        data[key.strip()] = value.strip().strip('"')
+    return data
+
+def cmd_process_inbox(args):
+    """PROCESS-INBOX: raw -> normalized -> ingest -> archive."""
+    ensure_system_dirs()
+    ensure_user_surface_files()
+    state = load_category_state()
+    raw_files = sorted(INBOX_RAW_DIR.glob("*.md"))
+    if not raw_files:
+        print("ℹ️ No raw inbox items found")
+        return 0
+
+    processed_count = 0
+    for raw_file in raw_files:
+        data = parse_raw_note(raw_file)
+        if data.get("processed", "false").lower() == "true":
+            continue
+
+        raw_text = data.get("raw_text", "")
+        event = raw_text.strip('"')
+        detected_category = normalize_category_name(infer_category(event))
+        energy = args.default_energy
+        lower_event = event.lower()
+        if any(word in lower_event for word in ["tired", "anxiety", "stress", "worried", "insomnia"]):
+            energy = "-"
+        elif any(word in lower_event for word in ["great", "productive", "calm", "energized"]):
+            energy = "+"
+
+        date = datetime.now().strftime("%Y-%m-%d")
+        normalized = (
+            f"date: {date}\n"
+            f"event: {json.dumps(event)}\n"
+            f"energy: {energy}\n"
+            f"possible_categories:\n"
+            f"  - {detected_category}\n"
+            "confidence: medium\n"
+            "needs_user_confirmation: false\n"
+        )
+        normalized_file = INBOX_NORMALIZED_DIR / raw_file.name
+        normalized_file.write_text(normalized)
+
+        # Keep user-facing experience minimal: log to Current Notes first.
+        current_notes = CURRENT_NOTES_FILE.read_text()
+        note_line = f"- {date}: {event} [{energy}]"
+        if note_line not in current_notes:
+            CURRENT_NOTES_FILE.write_text(current_notes.rstrip() + "\n" + note_line + "\n")
+
+        category_meta = state.get(detected_category, {
+            "visible": False,
+            "evidence_count": 0,
+            "last_seen": date,
+            "confidence": "low",
+            "status": "latent",
+            "needs_user_confirmation": False,
+        })
+        category_meta["evidence_count"] = int(category_meta.get("evidence_count", 0)) + 1
+        category_meta["last_seen"] = date
+        category_meta["confidence"] = "medium" if category_meta["evidence_count"] >= 3 else "low"
+        category_meta["status"] = "tracked"
+
+        intensity = 1 if energy in ["-", "--"] else 0
+        activation_score = compute_activation_score(
+            evidence_count=category_meta["evidence_count"],
+            intensity=intensity,
+            cross_links=0,
+            user_confirmation=1 if category_meta.get("user_confirmed") else 0,
+            contradiction_penalty=0
+        )
+        category_meta["activation_score"] = activation_score
+
+        if activation_score >= 6 or args.force_visible:
+            category_meta["visible"] = True
+            category_meta["status"] = "active"
+            visible_file = VISIBLE_DIR / f"{detected_category}.md"
+            if not visible_file.exists():
+                visible_file.write_text(
+                    f"# {detected_category}\n\n"
+                    "## Why this appeared\n"
+                    f"This page was created because repeated recent observations matched **{detected_category}**.\n\n"
+                    "## Observations\n"
+                    "## Current hypothesis\n"
+                    f"[Hypothesis] {detected_category} may be impacting current quality-of-life dynamics.\n\n"
+                    f"Confidence: {category_meta['confidence']}\n"
+                    "Needs confirmation: yes\n"
+                )
+            append_if_missing(visible_file, f"- {date}: {event} [{energy}]")
+        elif activation_score >= 4:
+            append_if_missing(REVIEW_QUEUE_FILE, f"- [{detected_category}] score {activation_score}: {event}")
+
+        state[detected_category] = category_meta
+
+        # Emergent category suggestion (safe, optional)
+        emergent_keywords = ["unreliable", "delay", "shame", "avoiding admin", "trusted"]
+        if sum(1 for kw in emergent_keywords if kw in lower_event) >= 2:
+            emergent_name = "Reliability Anxiety"
+            suggestion_file = EMERGING_DIR / f"Suggested - {emergent_name}.md"
+            if not suggestion_file.exists():
+                suggestion_file.write_text(
+                    f"# Suggested Category: {emergent_name}\n\n"
+                    "## Why this may matter\n"
+                    "[Hypothesis] Multiple entries indicate concern about being perceived as unreliable.\n\n"
+                    "## Evidence\n"
+                    "## Suggested links\n"
+                    "- [[Work]]\n- [[Relationships]]\n- [[Self-image]]\n- [[Avoidance]]\n\n"
+                    "## User decision\n"
+                    "- [ ] Accept\n- [ ] Rename\n- [ ] Reject\n- [ ] Merge into another category\n"
+                )
+            append_if_missing(suggestion_file, f"- {date}: {event}")
+            state[emergent_name] = {
+                "visible": False,
+                "evidence_count": int(state.get(emergent_name, {}).get("evidence_count", 0)) + 1,
+                "last_seen": date,
+                "confidence": "low",
+                "status": "suggested_new_category",
+                "needs_user_confirmation": True,
+            }
+
+        archived = INBOX_PROCESSED_DIR / raw_file.name
+        shutil.move(str(raw_file), archived)
+        processed_count += 1
+
+    save_category_state(state)
+    awareness_path = refresh_awareness(days=args.days)
+    print(f"✅ Processed {processed_count} inbox item(s)")
+    print(f"✅ Refreshed awareness: {awareness_path}")
+    log_operation("process-inbox", {"processed_count": processed_count, "days": args.days})
+    return 0
+
+def cmd_refresh_awareness(args):
+    """Refresh compressed system awareness snapshot."""
+    file_path = refresh_awareness(days=args.days)
+    print(f"✅ Awareness refreshed: {file_path}")
+    log_operation("refresh-awareness", {"file": str(file_path), "days": args.days})
+    return 0
+
+def cmd_contradictions(args):
+    """Build contradiction report from simple heuristics."""
+    ensure_system_dirs()
+    contradictions = [
+        "# Contradictions",
+        "",
+        f"updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "",
+        "## Detected",
+    ]
+
+    checks = [
+        ("Main Life Categories/Goals & Aspirations/Goals_Aspirations.md", "Main Life Categories/Work/Work.md", "Health goals may conflict with work intensity."),
+        ("Main Life Categories/Sleep Patterns/Sleep_Patterns__Overview.md", "Main Life Categories/Work/Work.md", "Sleep recovery may conflict with workload patterns."),
+    ]
+
+    found = 0
+    for a, b, message in checks:
+        pa = YOU_DIR / a
+        pb = YOU_DIR / b
+        if pa.exists() and pb.exists():
+            contradictions.append(f"- [Hypothesis] {message} Evidence: [[{Path(a).stem}]] ↔ [[{Path(b).stem}]] Confidence: low")
+            found += 1
+
+    if found == 0:
+        contradictions.append("- No contradictions detected with current heuristic checks.")
+
+    CONTRADICTIONS_FILE.write_text("\n".join(contradictions) + "\n")
+    print(f"✅ Wrote contradictions report: {CONTRADICTIONS_FILE}")
+    log_operation("contradictions", {"file": str(CONTRADICTIONS_FILE), "count": found})
+    return 0
+
+def cmd_daily_review(args):
+    """Generate daily review note."""
+    ensure_system_dirs()
+    today = datetime.now().strftime("%Y-%m-%d")
+    review_file = SYSTEM_DIR / f"DAILY_REVIEW_{today}.md"
+    review_content = f"""# Daily Review - {today}
+
+## Today's signals
+- Add key events from `you process-inbox`.
+
+## New patterns
+- Refer to [[AWARENESS]] and [[PATTERNS]].
+
+## Open loops
+- Track unresolved threads in [[OPEN_LOOPS]].
+
+## Suggested check-in
+- What shifted in energy after today's most significant event?
+"""
+    review_file.write_text(review_content)
+    print(f"✅ Daily review created: {review_file}")
+    log_operation("daily-review", {"file": str(review_file)})
+    return 0
+
+def cmd_obsidian_dashboard(args):
+    """Write Dataview-friendly dashboard file for Obsidian."""
+    ensure_system_dirs()
+    dashboard = SYSTEM_DIR / "OBSIDIAN_DASHBOARD.md"
+    content = """# Obsidian Dashboard
+
+## Visible Categories
+```dataview
+LIST FROM "Visible"
+SORT file.mtime DESC
+```
+
+## Active patterns
+```dataview
+TABLE confidence, status, last_seen
+FROM "System/Patterns"
+WHERE status = "active"
+SORT last_seen DESC
+```
+
+## Review queue
+```dataview
+LIST FROM "System"
+WHERE contains(file.name, "REVIEW") OR contains(file.name, "CONTRADICTIONS")
+```
+
+## Emerging Suggestions
+```dataview
+LIST FROM "Emerging"
+SORT file.ctime DESC
+```
+"""
+    dashboard.write_text(content)
+    print(f"✅ Dashboard created: {dashboard}")
+    log_operation("obsidian-dashboard", {"file": str(dashboard)})
+    return 0
+
 def main():
     parser = argparse.ArgumentParser(
         description="YOU System - Life Intelligence Wiki Operations",
@@ -389,6 +835,30 @@ def main():
     # LINT
     lint = subparsers.add_parser("lint", help="Health check")
     
+    # CAPTURE
+    capture = subparsers.add_parser("capture", help="Capture raw note to Inbox/raw")
+    capture.add_argument("--source", default="manual")
+    capture.add_argument("--text", required=True)
+
+    # PROCESS-INBOX
+    process_inbox = subparsers.add_parser("process-inbox", help="Process Inbox/raw into wiki updates")
+    process_inbox.add_argument("--default-energy", default="=", choices=["++", "+", "=", "-", "--"])
+    process_inbox.add_argument("--days", type=int, default=30)
+    process_inbox.add_argument("--force-visible", action="store_true", help="Immediately surface matched categories")
+
+    # REFRESH-AWARENESS
+    refresh = subparsers.add_parser("refresh-awareness", help="Rebuild System/AWARENESS.md")
+    refresh.add_argument("--days", type=int, default=30)
+
+    # CONTRADICTIONS
+    subparsers.add_parser("contradictions", help="Generate contradiction hypotheses report")
+
+    # DAILY-REVIEW
+    subparsers.add_parser("daily-review", help="Create daily review note in System/")
+
+    # OBSIDIAN-DASHBOARD
+    subparsers.add_parser("obsidian-dashboard", help="Create Dataview dashboard markdown")
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -405,7 +875,13 @@ def main():
         "ingest": cmd_ingest,
         "query": cmd_query,
         "predict": cmd_predict,
-        "lint": cmd_lint
+        "lint": cmd_lint,
+        "capture": cmd_capture,
+        "process-inbox": cmd_process_inbox,
+        "refresh-awareness": cmd_refresh_awareness,
+        "contradictions": cmd_contradictions,
+        "daily-review": cmd_daily_review,
+        "obsidian-dashboard": cmd_obsidian_dashboard,
     }
     
     return commands[args.command](args)

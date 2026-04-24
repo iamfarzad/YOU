@@ -23,25 +23,35 @@ Life domains influence each other. Work stress → Sleep quality → Relationshi
 ```
 YOU/
 ├── YOU.md                    # Hub and navigation
-├── Calendar.md               # Time-based tracking
-├── Life Interaction/         # Daily moments
-├── Main Life Categories/     # 49 life domains
-│   ├── Mental Health/
-│   ├── Physical Health/
-│   ├── Work/
-│   ├── Relationships/
-│   ├── Finance/
-│   └── ... (49 total)
-├── _TEMPLATE.md             # Category template
-└── _TEMPLATE_SUBTOPIC.md    # Sub-topic template
+├── Profile.md                # User-provided identity/context
+├── Current Notes.md          # Stream of recent observations
+├── Recent Reflections.md     # AI summaries/hypotheses
+├── Open Questions.md         # Unresolved prompts
+├── Visible/                  # Surfaced categories only
+├── Emerging/                 # Suggested new categories
+├── Inbox/
+│   ├── raw/                  # Immutable capture layer
+│   ├── normalized/           # Mechanical normalization layer
+│   └── processed/            # Archived processed raw notes
+├── System/
+│   ├── AWARENESS.md          # Compressed working-memory snapshot
+│   ├── TAXONOMY.md           # Hidden ontology
+│   ├── CATEGORY_RULES.md     # Surfacing thresholds
+│   ├── CATEGORY_STATE.json   # Machine-readable state
+│   ├── PATTERNS.md
+│   ├── OPEN_LOOPS.md
+│   ├── CONTRADICTIONS.md
+│   └── REVIEW_QUEUE.md
+└── Main Life Categories/     # Hidden scaffolding ontology
 ```
 
 ## Getting Started
 
-1. Start at `YOU.md`
-2. Navigate to any life category
-3. Use the template structure for new entries
-4. Track patterns across categories over time
+1. Start from `YOU.md` and the four visible pages (`Profile`, `Current Notes`, `Recent Reflections`, `Open Questions`)
+2. Capture raw signals with `you capture --source <source> --text "..."`
+3. Normalize + compile with `you process-inbox`
+4. Surface categories only when thresholds are met (`System/CATEGORY_RULES.md`)
+5. Review `System/AWARENESS.md` before deep category traversal
 
 ## Philosophy
 
