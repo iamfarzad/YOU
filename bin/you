@@ -38,6 +38,7 @@ PATTERNS_FILE = SYSTEM_DIR / "PATTERNS.md"
 OPEN_LOOPS_FILE = SYSTEM_DIR / "OPEN_LOOPS.md"
 CONTRADICTIONS_FILE = SYSTEM_DIR / "CONTRADICTIONS.md"
 REVIEW_QUEUE_FILE = SYSTEM_DIR / "REVIEW_QUEUE.md"
+FOCUS_FILE = SYSTEM_DIR / "FOCUS.md"
 RECALL_INDEX_MD_FILE = SYSTEM_DIR / "RECALL_INDEX.md"
 RECALL_INDEX_JSON_FILE = SYSTEM_DIR / "recall_index.json"
 OPEN_LOOPS_JSON_FILE = SYSTEM_DIR / "open_loops.json"
@@ -55,11 +56,13 @@ PROFILE_FILE = YOU_DIR / "Profile.md"
 CURRENT_NOTES_FILE = YOU_DIR / "Current Notes.md"
 RECENT_REFLECTIONS_FILE = YOU_DIR / "Recent Reflections.md"
 OPEN_QUESTIONS_FILE = YOU_DIR / "Open Questions.md"
+CANVAS_DIR = YOU_DIR / "Canvas"
+CANVAS_MAP_FILE = CANVAS_DIR / "YOU Memory Map.canvas"
 
 def ensure_system_dirs():
     """Ensure required inbox/system folders exist."""
     for path in [
-        INBOX_RAW_DIR, INBOX_NORMALIZED_DIR, INBOX_PROCESSED_DIR, SYSTEM_DIR, VISIBLE_DIR, EMERGING_DIR
+        INBOX_RAW_DIR, INBOX_NORMALIZED_DIR, INBOX_PROCESSED_DIR, SYSTEM_DIR, VISIBLE_DIR, EMERGING_DIR, CANVAS_DIR
     ]:
         path.mkdir(parents=True, exist_ok=True)
 
@@ -94,6 +97,13 @@ def ensure_user_surface_files():
             "# Recall Index\n\n"
             "Short memory cards for conversation-time retrieval.\n"
             "Each card must be relevance-filtered, confidence-labeled, and source-linked.\n"
+        )
+    if not FOCUS_FILE.exists():
+        FOCUS_FILE.write_text(
+            "# Focus Nodes\n\n"
+            f"updated: {datetime.now().strftime('%Y-%m-%d')}\n\n"
+            "## Current focus\n- (none yet)\n\n"
+            "## Why these are highlighted\n- Focus is assigned from visual importance and recency.\n"
         )
     if not RECALL_INDEX_JSON_FILE.exists():
         RECALL_INDEX_JSON_FILE.write_text(json.dumps({
@@ -142,6 +152,8 @@ def ensure_user_surface_files():
             "# Privacy\n\n"
             "YOU-memory is local-first. Avoid sending sensitive memory to remote services unless explicitly enabled in `System/config.json`.\n"
         )
+    if not CANVAS_MAP_FILE.exists():
+        CANVAS_MAP_FILE.write_text('{"nodes":[],"edges":[]}')
 
 def load_category_state() -> Dict:
     if CATEGORY_STATE_FILE.exists():
@@ -178,6 +190,11 @@ def compute_activation_score(evidence_count: int, intensity: int = 0, cross_link
                              user_confirmation: int = 0, contradiction_penalty: int = 0) -> int:
     recency_weight = 1 if evidence_count > 0 else 0
     return evidence_count + recency_weight + intensity + cross_links + user_confirmation - contradiction_penalty
+
+def compute_visual_importance(evidence_count: int, recent_activity: int, cross_links: int,
+                              open_loop_weight: int = 0, emotional_intensity: int = 0,
+                              user_pin: int = 0, stale_penalty: int = 0) -> int:
+    return evidence_count + recent_activity + cross_links + open_loop_weight + emotional_intensity + user_pin - stale_penalty
 
 def append_if_missing(file_path: Path, text: str):
     content = file_path.read_text() if file_path.exists() else ""
@@ -269,6 +286,36 @@ def load_open_loops() -> Dict:
 def save_open_loops(data: Dict):
     data["schema_version"] = SCHEMA_VERSION
     OPEN_LOOPS_JSON_FILE.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+def refresh_focus_from_state(state: Dict):
+    categories = state.get("categories", {})
+    ranked = sorted(
+        [(name, meta) for name, meta in categories.items() if isinstance(meta, dict)],
+        key=lambda item: item[1].get("importance", 0),
+        reverse=True
+    )[:5]
+    lines = [
+        "# Focus Nodes",
+        "",
+        f"updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        "",
+        "## Current focus",
+    ]
+    if ranked:
+        for name, meta in ranked:
+            lines.append(f"- [[{name}]] (importance={meta.get('importance', 0)}, confidence={meta.get('confidence', 'low')})")
+    else:
+        lines.append("- (none yet)")
+    lines.extend([
+        "",
+        "## Why these are highlighted",
+        "- High recent activity and cross-link influence.",
+        "- Open-loop impact and emotional intensity weighting.",
+        "",
+        "## Suggested next review",
+        "- Confirm whether the top focus node should remain pinned.",
+    ])
+    FOCUS_FILE.write_text("\n".join(lines) + "\n")
 
 def get_category_path(category_name: str) -> Optional[Path]:
     """Find category directory by fuzzy matching"""
@@ -425,6 +472,11 @@ def build_awareness_snapshot(days: int = 30) -> str:
     next_question = "What changed after the most recent high-stress event?"
 
     visible_summary = ", ".join(visible_categories[:8]) if visible_categories else "None yet"
+    focus_preview = ""
+    if FOCUS_FILE.exists():
+        focus_lines = [ln.strip() for ln in FOCUS_FILE.read_text().splitlines() if ln.strip().startswith("- [[")]
+        if focus_lines:
+            focus_preview = "\n## Focus preview\n" + "\n".join(focus_lines[:3]) + "\n"
 
     return f"""# YOU Awareness Snapshot
 updated: {datetime.now().strftime("%Y-%m-%d %H:%M")}
@@ -448,6 +500,7 @@ updated: {datetime.now().strftime("%Y-%m-%d %H:%M")}
 
 ## Next useful question
 "{next_question}"
+{focus_preview}
 """
 
 def refresh_awareness(days: int = 30) -> Path:
@@ -817,6 +870,10 @@ def cmd_process_inbox(args):
             "confidence": "low",
             "status": "latent",
             "needs_user_confirmation": False,
+            "node_type": "category",
+            "importance": 0,
+            "pinned": False,
+            "review_status": "needs_user_confirmation",
         })
         category_meta["evidence_count"] = int(category_meta.get("evidence_count", 0)) + 1
         category_meta["last_seen"] = date
@@ -832,13 +889,48 @@ def cmd_process_inbox(args):
             contradiction_penalty=0
         )
         category_meta["activation_score"] = activation_score
+        category_meta["recent_activity"] = int(category_meta.get("recent_activity", 0)) + 1
+        category_meta["cross_links"] = int(category_meta.get("cross_links", 0))
+        category_meta["color_group"] = "work" if detected_category == "Work" else "general"
+        category_meta["sensitivity"] = "medium" if detected_category in ["Mental Health", "Sleep Patterns", "Relationships"] else "low"
+        category_meta["energy"] = "negative" if "-" in energy else "positive"
+        category_meta["importance"] = compute_visual_importance(
+            evidence_count=category_meta["evidence_count"],
+            recent_activity=category_meta.get("recent_activity", 0),
+            cross_links=category_meta.get("cross_links", 0),
+            open_loop_weight=1 if "need to" in lower_event else 0,
+            emotional_intensity=1 if energy in ["-", "--"] else 0,
+            user_pin=1 if category_meta.get("pinned") else 0,
+            stale_penalty=0
+        )
+        if category_meta["importance"] >= 8:
+            category_meta["node_type"] = "focus"
+            category_meta["status"] = "active"
 
         if activation_score >= 6 or args.force_visible:
             category_meta["visible"] = True
             category_meta["status"] = "active"
             visible_file = VISIBLE_DIR / f"{detected_category}.md"
+            category_group = detected_category.lower().replace(" ", "_")
             if not visible_file.exists():
                 visible_file.write_text(
+                    "---\n"
+                    "type: memory_node\n"
+                    f"status: {category_meta['status']}\n"
+                    f"node_type: {category_meta.get('node_type', 'category')}\n"
+                    f"category_group: {category_group}\n"
+                    f"importance: {category_meta.get('importance', 1)}\n"
+                    f"confidence: {category_meta['confidence']}\n"
+                    f"energy: {category_meta.get('energy', 'neutral')}\n"
+                    f"last_seen: {date}\n"
+                    f"evidence_count: {category_meta['evidence_count']}\n"
+                    f"surface_level: {max(2, activation_score // 2)}\n"
+                    f"color_group: {category_meta.get('color_group', 'general')}\n"
+                    f"review_status: {category_meta.get('review_status', 'needs_user_confirmation')}\n"
+                    f"pinned: {str(category_meta.get('pinned', False)).lower()}\n"
+                    "tags:\n"
+                    f"  - you-memory\n  - node/{category_meta.get('node_type', 'category')}\n  - state/{category_meta['status']}\n  - confidence/{category_meta['confidence']}\n"
+                    "---\n\n"
                     f"# {detected_category}\n\n"
                     "## Why this appeared\n"
                     f"This page was created because repeated recent observations matched **{detected_category}**.\n\n"
@@ -925,6 +1017,7 @@ def cmd_process_inbox(args):
 
     state["categories"] = categories_state
     save_category_state(state)
+    refresh_focus_from_state(state)
     save_recall_index(recall_index)
     save_open_loops(loops_data)
     awareness_path = refresh_awareness(days=args.days)

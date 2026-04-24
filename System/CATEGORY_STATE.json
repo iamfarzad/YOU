@@ -1,4 +1,5 @@
 {
   "schema_version": "0.1.0",
+  "visual_importance_formula": "evidence_count + recent_activity + cross_links + open_loop_weight + emotional_intensity + user_pin - stale_penalty",
   "categories": {}
 }

@@ -13,6 +13,7 @@ AI agents can code, browse, plan, and use tools, but long projects still suffer 
 Users repeat themselves, rebuild project history, burn tokens, and lose continuity across agents and sessions.
 
 YOU-memory gives agents a user-owned memory layer: local markdown, source-linked observations, visible categories only when useful, and an `AWARENESS.md` file agents can read before helping.
+It also gives users a visible, editable Obsidian graph of what is active, what is uncertain, and what needs attention.
 
 ## Purpose
 
@@ -53,6 +54,7 @@ YOU/
 │   ├── EXTRACTION_SCHEMA.json # LLM extraction contract
 │   ├── CATEGORY_RULES.md     # Surfacing thresholds
 │   ├── CATEGORY_STATE.json   # Machine-readable state
+│   ├── FOCUS.md              # Current attention nodes
 │   ├── MEMORY_POLICY.md      # What can be auto-written
 │   ├── CONSENT.md
 │   ├── PRIVACY.md
@@ -78,6 +80,10 @@ See `adapters/` for minimal Claude Code, Codex, Hermes, OpenClaw, and gstack hoo
 6. For conversation retrieval, use `you recall --query "..."` (or `you-memory recall "..."`)
 7. Agent integrations should follow `AGENTS.md`.
 8. For automation use `you watch` / `you daemon`; for a quick run use `you demo`.
+
+## Visual Growth Loop
+
+conversation happens → memory cards update → category state updates → focus nodes refresh → Obsidian graph changes → user confirms/rejects/renames.
 
 ## Tests
 

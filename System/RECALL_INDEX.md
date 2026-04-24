@@ -19,6 +19,15 @@ Only surface memory if it is relevant, source-linked, confidence-labeled, and us
 - 3: Ask before opening
 - 4: Active flag (goals, deadlines, safety, major contradictions)
 
+## Visual Tag Conventions
+- `#node/focus`
+- `#node/hypothesis`
+- `#node/contradiction`
+- `#node/open_loop`
+- `#group/work`, `#group/wellbeing`, `#group/relationships`
+- `#state/active`, `#state/stale`
+- `#review/needed`
+
 ## Canonical Memory Card
 ```json
 {

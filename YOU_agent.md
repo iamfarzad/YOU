@@ -193,14 +193,15 @@ No code execution needed — read files, update files, surface patterns.
 
 1. Read `System/AWARENESS.md`
 2. Read `System/RECALL_INDEX.md` and `System/recall_index.json`
-3. Treat `System/EXTRACTION_SCHEMA.json` as the contract for structured extraction outputs
-4. Read `Profile.md`, `Current Notes.md`, `Recent Reflections.md`, `Open Questions.md`
-5. Read `log.md`
-6. Read `index.md` only if needed for hidden ontology navigation
-7. Read `Visible/` pages before `Main Life Categories/`
-8. Read only relevant category files in `Main Life Categories/` when evidence requires it
-9. Never infer from memory alone when source files disagree
-10. Cite source files when giving insight
+3. Read `System/FOCUS.md` and `System/open_loops.json`
+4. Treat `System/EXTRACTION_SCHEMA.json` as the contract for structured extraction outputs
+5. Read `Profile.md`, `Current Notes.md`, `Recent Reflections.md`, `Open Questions.md`
+6. Read `log.md`
+7. Read `index.md` only if needed for hidden ontology navigation
+8. Read `Visible/` pages before `Main Life Categories/`
+9. Read only relevant category files in `Main Life Categories/` when evidence requires it
+10. Never infer from memory alone when source files disagree
+11. Cite source files when giving insight
 
 ---
 

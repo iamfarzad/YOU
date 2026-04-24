@@ -36,6 +36,9 @@ updated: YYYY-MM-DD
 ---
 ```
 
+For surfaced nodes, include visual metadata fields such as:
+`type`, `status`, `node_type`, `importance`, `confidence`, `energy`, `last_seen`, `evidence_count`, `surface_level`, `color_group`, `review_status`, `pinned`, and graph tags.
+
 ---
 
 ## Temporal Template
@@ -97,6 +100,7 @@ Every file tracks across time:
 2. Summarize active patterns with confidence labels
 3. Track open loops and watchlist risks
 4. Write compressed snapshot to `System/AWARENESS.md`
+5. Refresh `System/FOCUS.md` for current attention nodes
 
 ### Recall (Conversation Memory)
 1. Read `System/recall_index.json` for candidate memories
