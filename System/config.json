@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.1.0",
+  "auto_capture": false,
+  "allow_sensitive_recall": true,
+  "allow_profile_updates_without_review": false,
+  "allow_remote_llm_processing": false,
+  "default_memory_surface_level": 2,
+  "private_categories": ["Mental Health", "Relationships", "Finance"]
+}

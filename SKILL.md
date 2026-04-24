@@ -3,7 +3,7 @@ name: you-system
 version: 1.0.0
 description: |
   Life Intelligence Wiki — temporal knowledge base for holistic life tracking.
-  Ingest observations, query across time, predict futures, lint health.
+  Ingest observations, query across time, map future-facing hypotheses, lint health.
   Supports Perspective→Past→Current→Future temporal traversal and cross-category pattern recognition.
 triggers:
   - log entry
@@ -32,7 +32,7 @@ allowed-tools:
 
 ## When to Use
 
-**Always** when working with personal life tracking, goal monitoring, burnout prevention, or pattern discovery across life domains. This is NOT generic note-taking — it's temporal intelligence with predictive capability.
+**Always** when working with personal life tracking, goal monitoring, burnout prevention, or pattern discovery across life domains. This is NOT generic note-taking — it's temporal intelligence with future-facing hypothesis mapping.
 
 ---
 
@@ -42,7 +42,7 @@ allowed-tools:
 |--------------|-----------|---------|
 | "Log this" / "record that" / "today I..." | **INGEST** | Add observation to appropriate category |
 | "What's the pattern?" / "connect the dots" | **QUERY** | Synthesize across temporal sections |
-| "What happens if?" / "where does this lead?" | **PREDICT** | Project future from Current state |
+| "What happens if?" / "where does this lead?" | **PREDICT** | Generate future-facing hypotheses from Current state |
 | "Check wiki" / "health check" | **LINT** | Validate structure, find gaps, surface contradictions |
 | "I want to track..." / "new category" | **INIT** | Create new category from template |
 
@@ -145,7 +145,7 @@ allowed-tools:
 
 ### PREDICT: "What happens if?"
 
-**Goal**: Project future trajectory from Current state.
+**Goal**: Produce future-facing hypotheses from Current state.
 
 **Inputs**:
 - Current situation or trend
