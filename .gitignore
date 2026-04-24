@@ -1,0 +1,32 @@
+# System files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Obsidian (if used)
+.obsidian/workspace.json
+.obsidian/graph.json
+.obsidian/cache/
+
+# IDE
+.cursorrules
+cursor.md
+.vscode/
+
+# Temp
+*.tmp
+*.temp
+
+# User data — these files contain personal information
+# Template versions live in templates/ for new vault setup
+log.md
+Profile.md
+Current Notes.md
+Recent Reflections.md
+Open Questions.md
+Calendar.md
+
+# Local state — machine-specific runtime data
+System/open_loops.json
+System/recall_index.json
+System/CATEGORY_STATE.json
