@@ -32,7 +32,7 @@ allowed-tools:
 
 ## When to Use
 
-**Always** when working with personal life tracking, goal monitoring, burnout prevention, or pattern discovery across life domains. This is NOT generic note-taking — it's temporal intelligence with predictive capability.
+**Always** when working with personal life tracking, goal monitoring, or pattern discovery across life domains. This is NOT generic note-taking — it's temporal intelligence with predictive capability.
 
 ---
 
