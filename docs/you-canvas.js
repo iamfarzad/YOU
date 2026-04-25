@@ -1,6 +1,6 @@
 /**
  * YOU Landing Page — Particle Morphing Canvas
- * Ported from FBC Lab AntigravityCanvas (React/TS) to vanilla JS.
+ * Ported from AntigravityCanvas (React/TS) to vanilla JS.
  * 4 shapes auto-cycle: orb → brain → constellation → "YOU" text
  * Spring physics, mouse repulsion, semi-transparent trail, CSS bloom.
  * Zero dependencies. ~350 lines.
