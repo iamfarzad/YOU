@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.1.0",
+  "observations": [
+    {
+      "text": "",
+      "source_quote": "",
+      "time_layer": "past | present | future",
+      "confidence": "low | medium | high"
+    }
+  ],
+  "category_candidates": [
+    {
+      "category": "",
+      "reason": "",
+      "confidence": "low | medium | high",
+      "should_activate": false
+    }
+  ],
+  "cross_links": [
+    {
+      "from": "",
+      "to": "",
+      "relationship": "",
+      "evidence": "",
+      "confidence": "low | medium | high"
+    }
+  ],
+  "emergent_categories": [
+    {
+      "name": "",
+      "reason_existing_categories_are_not_enough": "",
+      "evidence": [],
+      "needs_user_confirmation": true
+    }
+  ],
+  "profile_updates": [
+    {
+      "claim": "",
+      "source_quote": "",
+      "requires_user_confirmation": true
+    }
+  ],
+  "open_loops": [],
+  "contradictions": [],
+  "future_hypotheses": [],
+  "sensitivity": "low | medium | high"
+}

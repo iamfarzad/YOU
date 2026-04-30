@@ -3,7 +3,7 @@ tags:: #YOU #HomeNode #LifeOS #PersonalIntelligence
 
 # YOU
 
-Your central hub for life mapping, self-reflection, and holistic personal intelligence.
+Your central hub for life mapping, self-reflection, and personal intelligence.
 
 ---
 
@@ -24,58 +24,24 @@ Life domains influence each other. Work stress → Sleep quality → Relationshi
 
 ---
 
-## Life Categories
+## Start Here (User-facing)
 
-### Identity & Mind
-- [[Personality]] — character traits and behavioral patterns
-- [[Values & Principles]] — core beliefs and ethical foundations
-- [[Philosophical Beliefs]] — worldview, meaning, and existence
-- [[Goals & Aspirations]] — desired futures and ambitions
+- [[Profile]] — values, goals, context, and consent preferences
+- [[Current Notes]] — incoming observations and recent signals
+- [[Recent Reflections]] — lightweight summaries and hypotheses
+- [[Open Questions]] — unresolved threads to revisit
 
-### Wellbeing
-- [[Mental Health]] — cognitive health, patterns, resilience
-- [[Physical Health]] — bodily systems, vitality, movement
-- [[Emotional Wellbeing]] — feeling states and regulation
-- [[Stress Management]] — pressure handling and recovery
-- [[Anxiety and Fears]] — uncertainties and concerns managed
+---
 
-### Growth & Development
-- [[Personal Growth]] — evolution and advancement
-- [[Learning and Education]] — knowledge acquisition
-- [[Skills & Talents]] — abilities and aptitudes
-- [[Resilience and Grit]] — overcoming adversity
-- [[Coping Strategies]] — adaptation and recovery mechanisms
+## Growing Map
 
-### Career & Work
-- [[Work]] — professional endeavors and workplace
-- [[Career Progression]] — professional trajectory
-- [[Professional Skills Development]] — capability building
+- [[Visible]] — surfaced categories with enough evidence
+- [[Emerging]] — suggested categories awaiting confirmation
+- [[System/AWARENESS]] — compressed working-memory snapshot
+- [[System/RECALL_INDEX]] — conversation memory surfacing layer
 
-### Resources & Lifestyle
-- [[Finance]] — money, resources, wealth management
-- [[Home]] — living environment and domestic life
-- [[Daily Routines]] — daily structure and habits
-- [[Minimalist Lifestyle]] — intentional simplicity
-- [[Sustainability and Eco-friendliness]] — environmental impact
-
-### Relationships & Community
-- [[Family]] — kin and intimate connections
-- [[Relationships]] — partnerships and bonds
-- [[Social Life]] — friendships and social circles
-- [[Community Engagement]] — civic and local participation
-
-### Experiences & Expression
-- [[Travel & Adventures]] — exploration and journeys
-- [[Creative Projects]] — artistic and creative pursuits
-- [[Hobbies & Interests]] — passions and leisure
-- [[Recreation and Leisure]] — rest and play
-- [[Media Consumption]] — information and entertainment diet
-
-### Challenges & Navigation
-- [[Challenges & Setbacks]] — obstacles and difficulties faced
-- [[Digital Footprint]] — online presence and identity
-- [[Medical History]] — health records and conditions
-- [[Healthcare Management]] — care coordination
+> The full 51-category ontology is hidden scaffolding for the system.  
+> Categories become visible only when evidence passes surfacing rules.
 
 ---
 

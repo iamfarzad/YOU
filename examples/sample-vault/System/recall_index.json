@@ -1,0 +1,18 @@
+{
+  "memories": [
+    {
+      "id": "mem_2026_04_14_001",
+      "title": "Investor calls and avoidance",
+      "type": "pattern",
+      "summary": "Several entries mention stress or avoidance before investor-related conversations.",
+      "tags": ["work", "startup", "investors", "anxiety"],
+      "time_layer": "past-present",
+      "confidence": "medium",
+      "evidence_count": 3,
+      "last_seen": "2026-04-14",
+      "sensitivity": "medium",
+      "surface_level": 3,
+      "source_links": ["Current Notes.md", "Visible/Work.md"]
+    }
+  ]
+}
